@@ -27,7 +27,8 @@ subring Matrix := opts -> M -> (
 	"isSagbi" => false,
 	"isPartialSagbi" => false,
 	"partialDegree" => 0,
-	cache => cTable
+	cache => cTable,
+	SAGBI_Data := new MutableHashTable from {}
 	}    
     )
 subring List := opts -> L -> subring(opts, matrix{L})
