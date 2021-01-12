@@ -73,25 +73,24 @@ subalgebraBasis = method(
     );
 
 subalgebraBasis(Matrix) := o -> gensMatrix -> (
-    R := subring gensMatrix;
-    gens sagbi(R,o)
+    sagbi(o, subring gensMatrix)#"SAGBI_Data"#"SAGBI_Gens"
     );
 
 subalgebraBasis(List) := o -> L -> (
-    gens sagbi(o, subring L)
+    sagbi(o,subring L)#"SAGBI_Data"#"SAGBI_Gens"
     );
 
 subalgebraBasis(Subring) := o -> subR -> (
-    gens sagbi subR
+    sagbi(o, subR)#"SAGBI_Data"#"SAGBI_Gens"
     );
-
 
 sagbi = method(
     TypicalValue => Subring, 
     Options => {
     	Strategy => null,
     	Limit => 100,
-    	PrintLevel => 0
+    	PrintLevel => 0,
+	StorePending => false
     	}
     );
 
@@ -104,31 +103,69 @@ sagbi(List) := o -> L -> (
     );
 
 sagbi(Subring) := o -> R -> (
+    
     R.cache.SubalgComputations = new MutableHashTable;
     subalgComp := R.cache.SubalgComputations;
     
-    R.cache.SagbiDegrees = {};
-    subalgComp#"sagbiGB" = null;
+    if (#(R#"SAGBI_Data") > 0) then(
+	if R#"SAGBI_Done" then return R;
+	-- if there is anything in SAGBI_Data, copy over values to cache table for computations
+    	subalgComp#"SAGBI_Degs" = R#"SAGBI_Data"#"SAGBI_Degs";
+	subalgComp#"SAGBI_Gens" = R#"SAGBI_Data"#"SAGBI_Gens";
+	subalgComp#"SAGBI_Degree" = R#"SAGBI_Data"#"SAGBI_Computations"#"SAGBI_Degree"; 
+	if R."SAGBI_Data"#"SAGBI_Computations"#?"Pending" then (
+	    subalgComp#"Pending" = R."SAGBI_Data"#"SAGBI_Computations"#"Pending"   
+	) else (
+	    subalgComp#"Pending" = new MutableHashTable;
+	    reducedGens := subduction (R, gens R)
+	    if StorePending == false then(
+		reducedGens := compress submatBelowDegree(reducedGens, o.Limit+1);
+	    )
+	    insertPending(R, reducedGens);
+	)
+    	currDegree = subalgComp#"SAGBI_Degree" + 1
+    ) else (
+    	-- otherwise, initialize these values in cache table
+    	subalgComp#"SAGBI_Degs" = null;
+        subalgComp#"SAGBI_Degree" = 0;
+        subalgComp#"SAGBI_Gens" = matrix(ambient R,{{}});
+	
+	
+	-- In the final code, this will be a hashtable which is stored in the returned subring
+        subalgComp#"Pending" = new MutableHashTable;
+        
+	if StorePending == false then(
+	-- Only look at generators below degree limit.  Add those generators to the SubalgebraGenerators
+	     reducedGens := compress submatBelowDegree(gens R, o.Limit+1);
+    	     insertPending(R, reducedGens);
+	) else (
+	     insertPending(R, compress gens R)
+	)
+    	-- Remove elements of coefficient ring
+        (subalgComp#"Pending")#0 = {};
+    	processPending(R, o.Limit);
+	
+	--what is "CurrentLowest"?
+    	currDegree = subalgComp#"CurrentLowest" + 1;
+	      --write corresponding initializations in currDegree = subalgComp#"SAGBI_Degree" + 1first conditional
+    );
     
-    currDegree := null;
+    subalgComp#"SAGBI_Done" = false;
+    
+    sagbiGB := null;
+    
+    -- no equivalents
     nLoops := null;
-    R.cache.SagbiDone = false;
+    
+    -- no equivalents
     syzygyPairs := null;
     newElems := null;
     
-    subalgComp#"Pending" = new MutableList from toList(o.Limit+1:{});
-    R.cache.SagbiGens = matrix(ambient R,{{}});
+    -- now stored in subalgComp rather than R.cache 
+    -- R.cache.SagbiGens = matrix(ambient R,{{}});
 
     -- Get the maximum degree of the generators. This is used as a stopping condition.
-    maxGensDeg := (max degrees source gens R)_0;
-
-    -- Only look at generators below degree limit.  Add those generators to the SubalgebraGenerators
-    reducedGens := compress submatBelowDegree(gens R, o.Limit+1);
-    insertPending(R, reducedGens, o.Limit);
-    -- Remove elements of coefficient ring
-    (subalgComp#"Pending")#0 = {};
-    processPending(R, o.Limit);
-    currDegree = subalgComp#"CurrentLowest" + 1;
+    maxGensDeg := (max degrees source gens R)_0;    
     
     isPartial := false;
        

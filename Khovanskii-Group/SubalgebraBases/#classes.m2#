@@ -32,8 +32,9 @@ subring List := opts -> L -> subring(opts, matrix{L})
 storesagbi Subring := opts -> S -> (
     R := ambient S;
     M := gens S;
-    cTable := new CacheTable from{};
     if S."SAGBI_Data"#?"SAGBI_Computations" then (
+	cTable := new CacheTable from S.cache;
+        remove(cTable, "SAGBI_Computations")
     	SAGBI_Comp := S.cache#"SAGBI_Computations",
 	Gens => SAGBI_Comp#"SAGBI_Gens",
 	SAGBI_Hash := new HashTable from{

@@ -5,33 +5,32 @@ getMonomialOrder = R -> (options R).MonomialOrder
     -- R is a subalgebra
     -- candidates is a matrix of elements of the subalgebra.
     -- Algorithm makes a pass through the elements in the first row of "candidates" and places them in the correct sublist of subalgComp#"Pending".
-insertPending = (R, candidates, maxDegree) -> (
+insertPending = (R, candidates) -> (
     subalgComp := R.cache.SubalgComputations;
     
     if subalgComp#?"Pending" == false then(
-	subalgComp#"Pending" = new MutableList from (maxDegree:{});
+	subalgComp#"Pending" = new MutableHashTable;
 	);
     
     for i from 0 to (numcols candidates)-1 do(
         -- get the entry of the column and its degree
         candidate := candidates_(0,i);
         level := (degree candidate)_0;
-        -- if the degree isn't too large, then add f to the correct list
-        if level <= maxDegree then (
-	    (subalgComp#"Pending")#level = append((subalgComp#"Pending")#level, candidate);
-            );
-    	);
-    )
+	if subalgComp#"Pending"#?level then(
+            subalgComp#"Pending"#level = append(subalgComp#"Pending"#level, candidate);
+    	) else (
+	    subalgComp#"Pending"#level = new MutableList from{candidate};
+	);
+    );
+)
 
 -- Finds the lowest nonempty list in Pending
 -- Makes a pass through the lists of Pending until it finds something nonempty
     -- R is a subalgebra
     -- maxDegree is an integer
-lowestDegree = (R, maxDegree) -> (
+lowestDegree = (R) -> (
     subalgComp := R.cache.SubalgComputations;
-    i := 0;
-    while i <= maxDegree and (subalgComp#"Pending")#i === {} do i=i+1;
-    i
+    min keys subalgComp#"Pending"
     )
 
 -- Adds newGens to R.cache.SagbiGens. Updates the appropriate rings/maps in R.cache.SubalgComputations.
@@ -64,23 +63,24 @@ submatByDegree = (inputMatrix, currDegree) -> (
 -- !!!Assumes that the pending list has been subducted!!!
    -- R is the subalgebra.
    -- maxDegree is the degree limit.
-processPending = (R, maxDegree) -> (
+processPending = (R) -> (
 
     subalgComp := R.cache.SubalgComputations;
-    currentLowest := lowestDegree(R, maxDegree);
+    currentLowest := lowestDegree(R);
     
-    if currentLowest <= maxDegree then (
+    if currentLowest != infinity then (
 	-- remove redundant elements of the lowest degree in subalgComp#"Pending".
 	reducedGenerators := gens gb(matrix{(subalgComp#"Pending")#currentLowest}, DegreeLimit=>currentLowest);
-    	(subalgComp#"Pending")#currentLowest = {};
-    	insertPending(R, reducedGenerators, maxDegree);
+    	remove(subalgComp#"Pending", currentLowest);
+    	insertPending(R, reducedGenerators);
     	-- Find the lowest degree elements after reduction.
-    	currentLowest = lowestDegree(R, maxDegree);
-    	-- Add new generators to the basis
-    	if currentLowest <= maxDegree then (
+    	currentLowest = lowestDegree(R);
+	if currentLowest != infinity then (
+    	    -- Add new generators to the basis
             appendToBasis(R, matrix{(subalgComp#"Pending")#currentLowest});
-            (subalgComp#"Pending")#currentLowest = {};
+            remove(subalgComp#"Pending", currentLowest);
 	    );
     	);
     subalgComp#"CurrentLowest" = currentLowest;
     )
+)
